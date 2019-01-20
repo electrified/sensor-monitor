@@ -1,8 +1,11 @@
 from sys import exit, argv
 from PySide2.QtWidgets import (QApplication, QLabel, QPushButton,
                                QVBoxLayout, QWidget, QTableView,
-                               QAbstractItemView, QHeaderView)
+                               QAbstractItemView, QHeaderView, QMenuBar, QMenu, QDockWidget)
 from PySide2.QtCore import Slot, Qt, QModelIndex, QTimer
+from PySide2.QtCharts import QtCharts
+from time import time
+
 # from PySide2.QtWidgets import (QWidget)
 
 
@@ -14,7 +17,13 @@ class MyWidget(QWidget):
     def __init__(self):
         QWidget.__init__(self)
 
+        self.sensortypes = ["in", "curr", "fan", "temp"]
+        self.chartView = {}
+
+        self.createMenu()
         self.tableModel = TableModel()
+
+        self.dock = QDockWidget()
 
         self.tableView = QTableView()
         self.tableView.setModel(self.tableModel)
@@ -29,8 +38,11 @@ class MyWidget(QWidget):
         self.tableView.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         # self.tableView.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
 
+        self.dock.layout().addWidget(self.tableView)
+
         self.layout = QVBoxLayout()
-        self.layout.addWidget(self.tableView)
+        self.layout.setMenuBar(self.menuBar)
+        self.layout.addWidget(self.dock)
         self.setLayout(self.layout)
 
         timer = QTimer(self)
@@ -38,8 +50,29 @@ class MyWidget(QWidget):
         timer.setInterval(1000)
         timer.start()
 
+        for sensorType in self.sensortypes:
+            series = QtCharts.QLineSeries()
+            series.append(0, 6)
+            series.append(2, 4)
+
+            chart_view = QtCharts.QChartView()
+            self.layout.addWidget(chart_view)
+
+            chart_view.chart().addSeries(series)
+
+            chart_view.chart().createDefaultAxes()
+            chart_view.chart().legend().setAlignment(Qt.AlignLeft)
+            chart_view.chart().axisX().setRange(0, 1000)
+            chart_view.chart().axisY().setRange(0, 100)
+            chart_view.show()
+
+            self.chartView[sensorType] = chart_view
+
+        self.chartSeries = {}
+
         self.get_sensors()
 
+        self.updateNumber = 0
 
     @Slot()
     def magic(self):
@@ -51,6 +84,10 @@ class MyWidget(QWidget):
 
         for sensor in sensors:
             self.tableModel.addSensor(sensor)
+            series = QtCharts.QLineSeries()
+            series.setName(sensor.label)
+            self.chartSeries[sensor.name] = series
+            self.chartView[sensor.type].chart().addSeries(series)
         #
         # for sensor in sensors:
         #     # Step 1: create the  row
@@ -67,9 +104,21 @@ class MyWidget(QWidget):
 
     def update_sensors_values(self):
         for index, sensor in enumerate(self.tableModel.sensors):
-            new_value = get_sensor_value(sensor.name)
-            sensor.setCurrentValue(new_value)
+            sensor.setCurrentValue(get_sensor_value(sensor.name))
             self.tableModel.dataChanged.emit(index, index, 0)
+            self.chartView[sensor.type].chart().series()[index].append(self.updateNumber, sensor.getScaledValue())
+
+        self.updateNumber += 1
+
+    def createMenu(self):
+        self.menuBar = QMenuBar()
+
+        self.fileMenu = QMenu("&File", self)
+        self.exitAction = self.fileMenu.addAction("E&xit")
+        self.menuBar.addMenu(self.fileMenu)
+
+        self.exitAction.triggered.connect(self.close)
+
 
 if __name__ == "__main__":
     app = QApplication(argv)
