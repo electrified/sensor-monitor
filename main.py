@@ -1,7 +1,7 @@
 from sys import exit, argv
 from PySide2.QtWidgets import (QApplication, QLabel, QPushButton,
-                               QVBoxLayout, QWidget, QTableView,
-                               QAbstractItemView, QHeaderView, QMenuBar, QMenu, QDockWidget)
+                               QVBoxLayout, QHBoxLayout, QWidget, QTableView,
+                               QAbstractItemView, QHeaderView, QMenuBar, QMenu, QDockWidget, QSplitter, QSizePolicy)
 from PySide2.QtCore import Slot, Qt, QModelIndex, QTimer
 from PySide2.QtCharts import QtCharts
 from time import time
@@ -23,27 +23,38 @@ class MyWidget(QWidget):
         self.createMenu()
         self.tableModel = TableModel()
 
-        self.dock = QDockWidget()
+        # self.dock = QDockWidget()
 
         self.tableView = QTableView()
         self.tableView.setModel(self.tableModel)
         # self.tableView.setSortingEnabled(True)
         self.tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.tableView.horizontalHeader().setStretchLastSection(True)
+        # self.tableView.horizontalHeader().setStretchLastSection(True)
         self.tableView.verticalHeader().hide()
         self.tableView.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tableView.setSelectionMode(QAbstractItemView.SingleSelection)
 
-        self.tableView.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.tableView.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.tableView.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        # self.tableView.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        # self.tableView.setSizePolicy(QSizePolicy.horizontalPolicy(ds))
+        # self.dock.setWidget(self.tableView)
 
-        self.dock.layout().addWidget(self.tableView)
+        self.mainLayout = QHBoxLayout()
+        self.mainLayout.setMenuBar(self.menuBar)
+        # self.mainLayout.addWidget(self.dock)
 
         self.layout = QVBoxLayout()
-        self.layout.setMenuBar(self.menuBar)
-        self.layout.addWidget(self.dock)
-        self.setLayout(self.layout)
+
+        self.widget = QWidget()
+        self.widget.setLayout(self.layout)
+
+        self.splitter = QSplitter()
+        self.splitter.addWidget(self.tableView)
+        self.splitter.addWidget(self.widget)
+
+        self.mainLayout.addWidget(self.splitter)
+
+        self.setLayout(self.mainLayout)
 
         timer = QTimer(self)
         timer.timeout.connect(self.update_sensors_values)
@@ -51,20 +62,8 @@ class MyWidget(QWidget):
         timer.start()
 
         for sensorType in self.sensortypes:
-            series = QtCharts.QLineSeries()
-            series.append(0, 6)
-            series.append(2, 4)
-
             chart_view = QtCharts.QChartView()
             self.layout.addWidget(chart_view)
-
-            chart_view.chart().addSeries(series)
-
-            chart_view.chart().createDefaultAxes()
-            chart_view.chart().legend().setAlignment(Qt.AlignLeft)
-            chart_view.chart().axisX().setRange(0, 1000)
-            chart_view.chart().axisY().setRange(0, 100)
-            chart_view.show()
 
             self.chartView[sensorType] = chart_view
 
@@ -84,10 +83,19 @@ class MyWidget(QWidget):
 
         for sensor in sensors:
             self.tableModel.addSensor(sensor)
+
             series = QtCharts.QLineSeries()
             series.setName(sensor.label)
+
             self.chartSeries[sensor.name] = series
+
+
             self.chartView[sensor.type].chart().addSeries(series)
+            self.chartView[sensor.type].chart().createDefaultAxes()
+            self.chartView[sensor.type].chart().legend().setAlignment(Qt.AlignLeft)
+            self.chartView[sensor.type].chart().axisX().setRange(0, 100)
+            self.chartView[sensor.type].chart().axisY().setRange(0, 0)
+            self.chartView[sensor.type].show()
         #
         # for sensor in sensors:
         #     # Step 1: create the  row
@@ -106,7 +114,12 @@ class MyWidget(QWidget):
         for index, sensor in enumerate(self.tableModel.sensors):
             sensor.setCurrentValue(get_sensor_value(sensor.name))
             self.tableModel.dataChanged.emit(index, index, 0)
-            self.chartView[sensor.type].chart().series()[index].append(self.updateNumber, sensor.getScaledValue())
+
+            chart = self.chartView[sensor.type].chart()
+            if sensor.getScaledValue() > chart.axisY(self.chartSeries[sensor.name]).max():
+                chart.axisY(self.chartSeries[sensor.name]).setMax(round(sensor.getScaledValue() + 5, -1))
+
+            self.chartSeries[sensor.name].append(self.updateNumber, sensor.getScaledValue())
 
         self.updateNumber += 1
 
