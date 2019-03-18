@@ -1,14 +1,13 @@
 from sys import exit, argv
 from PySide2.QtWidgets import (QApplication, QLabel, QPushButton,
                                QVBoxLayout, QHBoxLayout, QWidget, QTableView,
-                               QAbstractItemView, QHeaderView, QMenuBar, QMenu, QDockWidget, QSplitter, QSizePolicy)
+                               QAbstractItemView, QHeaderView, QMenuBar, QMenu, QDockWidget, QSplitter, QSizePolicy, QMessageBox)
 from PySide2.QtCore import Slot, Qt, QModelIndex, QTimer
 from PySide2.QtCharts import QtCharts
 from time import time
 
 # from PySide2.QtWidgets import (QWidget)
-
-
+from about import About
 from hwmon_interface import get_sensor_value, get_sensor_label, get_list_of_sensors
 
 from tablemodel import TableModel
@@ -128,9 +127,21 @@ class MyWidget(QWidget):
 
         self.fileMenu = QMenu("&File", self)
         self.exitAction = self.fileMenu.addAction("E&xit")
+        self.exitAction.triggered.connect(self.close)
+
         self.menuBar.addMenu(self.fileMenu)
 
-        self.exitAction.triggered.connect(self.close)
+        self.helpMenu = QMenu("&Help", self)
+        self.aboutAction = self.helpMenu.addAction("&About")
+        self.aboutAction.triggered.connect(self.about)
+
+        self.menuBar.addMenu(self.helpMenu)
+
+    def about(self):
+        # form = About()
+        # form.show()
+        QMessageBox.about(self, "About", "Asus sensor monitor v1")
+
 
 
 if __name__ == "__main__":
